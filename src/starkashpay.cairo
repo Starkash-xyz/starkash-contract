@@ -265,13 +265,15 @@ pub mod StarkashPay {
         ) {
             self.pausable.assert_not_paused();
 
+            let mut merchant = self.all_merchant.read(merchant_id);
+            assert(merchant.is_active, 'Merchant is inactive');
             assert(payment_token == self.payment_token.read(), 'Invalid token');
+
             let fee_percentage: u256 = 5; // Fee 0.05%
             let fee_divisor: u256 = 10000;
 
             let fee_amount = amount * fee_percentage / fee_divisor;
             let amount_after_fee = amount - fee_amount;
-            let mut merchant = self.all_merchant.read(merchant_id);
 
             let this_contract = get_contract_address();
             let strk_contract = IERC20Dispatcher { contract_address: payment_token };
