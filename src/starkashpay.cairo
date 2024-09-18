@@ -44,22 +44,22 @@ trait IStarkashPay<TContractState> {
         merchant_id: u64,
         merchant_name: felt252,
         merchant_wallet: ContractAddress
-    );
-    fn deactivate_merchant(ref self: TContractState, merchant_id: u64);
+    ) -> Merchant;
+    fn deactivate_merchant(ref self: TContractState, merchant_id: u64) -> u64;
     fn pay(
         ref self: TContractState,
         merchant_id: u64,
         billing_id: felt252,
         payment_token: ContractAddress,
         amount: u256,
-    );
+    ) -> MerchantBilling;
     fn pay_p2p(
         ref self: TContractState,
         billing_id: felt252,
         receiver: ContractAddress,
         payment_token: ContractAddress,
         amount: u256,
-    );
+    ) -> P2PBilling;
     // fn withdraw_fee(ref self: TContractState, shop_id: u64, payment_token: ContractAddress);
 }
 
@@ -224,7 +224,7 @@ pub mod StarkashPay {
             merchant_id: u64,
             merchant_name: felt252,
             merchant_wallet: ContractAddress
-        ) {
+        ) -> Merchant {
             self.pausable.assert_not_paused();
 
             let merchant = self.all_merchant.read(merchant_id);
@@ -238,9 +238,10 @@ pub mod StarkashPay {
             };
             self.all_merchant.write(merchant_id, new_merchant);
             self.emit(MerchantUpdated { merchant_id });
+            new_merchant
         }
 
-        fn deactivate_merchant(ref self: ContractState, merchant_id: u64) {
+        fn deactivate_merchant(ref self: ContractState, merchant_id: u64) -> u64 {
             self.pausable.assert_not_paused();
 
             let merchant = self.all_merchant.read(merchant_id);
@@ -254,6 +255,7 @@ pub mod StarkashPay {
             };
             self.all_merchant.write(merchant_id, new_merchant);
             self.emit(MerchantDeactivated { merchant_id });
+            merchant_id
         }
 
         fn pay(
@@ -262,7 +264,7 @@ pub mod StarkashPay {
             billing_id: felt252,
             payment_token: ContractAddress,
             amount: u256,
-        ) {
+        ) -> MerchantBilling {
             self.pausable.assert_not_paused();
 
             let mut merchant = self.all_merchant.read(merchant_id);
@@ -291,6 +293,7 @@ pub mod StarkashPay {
 
             self.emit(Paid { merchant_id, billing_id, payment_token, amount, timestamp });
             self.merchant_billing.write(billing_id, billing);
+            billing
         }
 
         fn pay_p2p(
@@ -299,7 +302,7 @@ pub mod StarkashPay {
             receiver: ContractAddress,
             payment_token: ContractAddress,
             amount: u256,
-        ) {
+        ) -> P2PBilling {
             self.pausable.assert_not_paused();
 
             assert(payment_token == self.payment_token.read(), 'Invalid token');
@@ -317,6 +320,7 @@ pub mod StarkashPay {
 
             self.emit(P2PPaid { billing_id, receiver, payer, payment_token, amount, timestamp });
             self.p2p_billing.write(billing_id, billing);
+            billing
         }
     }
 }
