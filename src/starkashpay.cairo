@@ -75,11 +75,20 @@ pub mod StarkashPay {
         StoragePointerReadAccess
     };
 
+    use openzeppelin::access::ownable::OwnableComponent;
+
+    component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+
+    #[abi(embed_v0)]
+    impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
+    impl InternalImpl = OwnableComponent::InternalImpl<ContractState>;
+
     #[storage]
     struct Storage {
+        #[substorage(v0)]
+        ownable: OwnableComponent::Storage,
         merchant_count: u64,
         all_merchant: Map::<u64, Merchant>,
-        owner: ContractAddress,
         payment_token: ContractAddress,
         is_lock: bool,
         merchant_billing: Map::<felt252, MerchantBilling>,
@@ -89,6 +98,8 @@ pub mod StarkashPay {
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
+        #[flat]
+        OwnableEvent: OwnableComponent::Event,
         MerchantCreated: MerchantCreated,
         MerchantUpdated: MerchantUpdated,
         MerchantDeactivated: MerchantDeactivated,
@@ -134,10 +145,12 @@ pub mod StarkashPay {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, payment_token: ContractAddress) {
-        self.merchant_count.write(0);
-        self.owner.write(get_caller_address());
+    fn constructor(ref self: ContractState, owner: ContractAddress, payment_token: ContractAddress) {
+        assert(Zero::is_non_zero(@owner), 'Owner address zero');
+        assert(Zero::is_non_zero(@payment_token), 'Payment token address zero');
+        self.ownable.initializer(owner);
         self.payment_token.write(payment_token);
+        self.merchant_count.write(0);
     }
 
     #[abi(embed_v0)]
@@ -279,11 +292,6 @@ pub mod StarkashPay {
     // *************************************************************************
     #[generate_trait]
     impl Private of PrivateTrait {
-        fn only_owner(ref self: ContractState) {
-            let caller = get_caller_address();
-            assert(caller == self.owner.read(), 'only owner');
-        }
-
         fn lock_contract(ref self: ContractState) {
             self.is_lock.write(true);
         }
