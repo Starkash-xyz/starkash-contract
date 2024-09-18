@@ -75,9 +75,15 @@ pub mod StarkashPay {
         StoragePointerReadAccess
     };
 
+    use openzeppelin::security::PausableComponent;
     use openzeppelin::access::ownable::OwnableComponent;
 
+    component!(path: PausableComponent, storage: pausable, event: PausableEvent);
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+
+    #[abi(embed_v0)]
+    impl PausableImpl = PausableComponent::PausableImpl<ContractState>;
+    impl PausableInternalImpl = PausableComponent::InternalImpl<ContractState>;
 
     #[abi(embed_v0)]
     impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
@@ -90,9 +96,10 @@ pub mod StarkashPay {
         merchant_count: u64,
         all_merchant: Map::<u64, Merchant>,
         payment_token: ContractAddress,
-        is_lock: bool,
         merchant_billing: Map::<felt252, MerchantBilling>,
         p2p_billing: Map::<felt252, P2PBilling>,
+        #[substorage(v0)]
+        pausable: PausableComponent::Storage
     }
 
     #[event]
@@ -105,6 +112,8 @@ pub mod StarkashPay {
         MerchantDeactivated: MerchantDeactivated,
         Paid: Paid,
         P2PPaid: P2PPaid,
+        #[flat]
+        PausableEvent: PausableComponent::Event
     }
 
     #[derive(Drop, starknet::Event)]
@@ -153,6 +162,18 @@ pub mod StarkashPay {
         self.merchant_count.write(0);
     }
 
+    #[external(v0)]
+    fn pause(ref self: ContractState) {
+        self.ownable.assert_only_owner();
+        self.pausable.pause();
+    }
+
+    #[external(v0)]
+    fn unpause(ref self: ContractState) {
+        self.ownable.assert_only_owner();
+        self.pausable.unpause();
+    }
+
     #[abi(embed_v0)]
     impl StarkashPay of super::IStarkashPay<ContractState> {
         fn get_merchant(self: @ContractState, merchant_id: u64) -> Merchant {
@@ -185,6 +206,8 @@ pub mod StarkashPay {
         fn create_merchant(
             ref self: ContractState, merchant_name: felt252, merchant_wallet: ContractAddress
         ) -> u64 {
+            self.pausable.assert_not_paused();
+
             let merchant_id = self.merchant_count.read() + 1;
             let creator = get_caller_address();
             let merchant = Merchant {
@@ -202,6 +225,8 @@ pub mod StarkashPay {
             merchant_name: felt252,
             merchant_wallet: ContractAddress
         ) {
+            self.pausable.assert_not_paused();
+
             let merchant = self.all_merchant.read(merchant_id);
             assert(merchant.creator == get_caller_address(), 'Not owner');
             let new_merchant = Merchant {
@@ -216,6 +241,8 @@ pub mod StarkashPay {
         }
 
         fn deactivate_merchant(ref self: ContractState, merchant_id: u64) {
+            self.pausable.assert_not_paused();
+
             let merchant = self.all_merchant.read(merchant_id);
             assert(merchant.creator == get_caller_address(), 'Not owner');
             let new_merchant = Merchant {
@@ -236,6 +263,8 @@ pub mod StarkashPay {
             payment_token: ContractAddress,
             amount: u256,
         ) {
+            self.pausable.assert_not_paused();
+
             assert(payment_token == self.payment_token.read(), 'Invalid token');
             let fee_percentage: u256 = 5; // Fee 0.05%
             let fee_divisor: u256 = 10000;
@@ -269,6 +298,8 @@ pub mod StarkashPay {
             payment_token: ContractAddress,
             amount: u256,
         ) {
+            self.pausable.assert_not_paused();
+
             assert(payment_token == self.payment_token.read(), 'Invalid token');
             assert(Zero::is_non_zero(@receiver), 'Receiver address zero');
 
@@ -284,22 +315,6 @@ pub mod StarkashPay {
 
             self.emit(P2PPaid { billing_id, receiver, payer, payment_token, amount, timestamp });
             self.p2p_billing.write(billing_id, billing);
-            self.unlock_contract();
-        }
-    }
-    // *************************************************************************
-    //                          PRIVATE FUNCTIONS
-    // *************************************************************************
-    #[generate_trait]
-    impl Private of PrivateTrait {
-        fn lock_contract(ref self: ContractState) {
-            self.is_lock.write(true);
-        }
-        fn unlock_contract(ref self: ContractState) {
-            self.is_lock.write(false);
-        }
-        fn only_unlock(ref self: ContractState) {
-            assert(self.is_lock.read() == false, 're-entrancy');
         }
     }
 }
