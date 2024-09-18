@@ -217,6 +217,7 @@ pub mod StarkashPay {
             ref self: ContractState, merchant_name: felt252, merchant_wallet: ContractAddress
         ) -> u64 {
             self.pausable.assert_not_paused();
+            assert(Zero::is_non_zero(@merchant_wallet), 'Merchant address zero');
 
             let merchant_id = self.merchant_count.read() + 1;
             let creator = get_caller_address();
@@ -239,6 +240,7 @@ pub mod StarkashPay {
 
             let merchant = self.all_merchant.read(merchant_id);
             assert(merchant.creator == get_caller_address(), 'Not owner');
+            assert(Zero::is_non_zero(@merchant_wallet), 'Merchant address zero');
             let new_merchant = Merchant {
                 merchant_id: merchant.merchant_id,
                 creator: merchant.creator,
@@ -281,6 +283,9 @@ pub mod StarkashPay {
             assert(merchant.is_active, 'Merchant is inactive');
             assert(payment_token == self.payment_token.read(), 'Invalid token');
 
+            let existing_merchant_billing_id = self.merchant_billing.read((billing_id));
+            assert(existing_merchant_billing_id.billing_id == 0, 'Merchant billing ID already exists');
+
             let fee_percentage: u256 = 5; // Fee 0.05%
             let fee_divisor: u256 = 10000;
 
@@ -319,6 +324,9 @@ pub mod StarkashPay {
 
             assert(payment_token == self.payment_token.read(), 'Invalid token');
             assert(Zero::is_non_zero(@receiver), 'Receiver address zero');
+
+            let existing_p2p_billing_id = self.p2p_billing.read((billing_id));
+            assert(existing_p2p_billing_id.billing_id == 0, 'P2P billing ID already exists');
 
             let strk_contract = IERC20Dispatcher { contract_address: payment_token };
             let payer = get_caller_address();
