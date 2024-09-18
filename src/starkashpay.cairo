@@ -77,9 +77,13 @@ pub mod StarkashPay {
 
     use openzeppelin::security::PausableComponent;
     use openzeppelin::access::ownable::OwnableComponent;
+    use openzeppelin::security::ReentrancyGuardComponent;
 
-    component!(path: PausableComponent, storage: pausable, event: PausableEvent);
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+    component!(path: PausableComponent, storage: pausable, event: PausableEvent);
+    component!(
+        path: ReentrancyGuardComponent, storage: reentrancy_guard, event: ReentrancyGuardEvent
+    );
 
     #[abi(embed_v0)]
     impl PausableImpl = PausableComponent::PausableImpl<ContractState>;
@@ -87,7 +91,9 @@ pub mod StarkashPay {
 
     #[abi(embed_v0)]
     impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
-    impl InternalImpl = OwnableComponent::InternalImpl<ContractState>;
+    impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
+
+    impl InternalImpl = ReentrancyGuardComponent::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
@@ -99,7 +105,9 @@ pub mod StarkashPay {
         merchant_billing: Map::<felt252, MerchantBilling>,
         p2p_billing: Map::<felt252, P2PBilling>,
         #[substorage(v0)]
-        pausable: PausableComponent::Storage
+        pausable: PausableComponent::Storage,
+        #[substorage(v0)]
+        reentrancy_guard: ReentrancyGuardComponent::Storage
     }
 
     #[event]
@@ -113,7 +121,9 @@ pub mod StarkashPay {
         Paid: Paid,
         P2PPaid: P2PPaid,
         #[flat]
-        PausableEvent: PausableComponent::Event
+        PausableEvent: PausableComponent::Event,
+        #[flat]
+        ReentrancyGuardEvent: ReentrancyGuardComponent::Event
     }
 
     #[derive(Drop, starknet::Event)]
@@ -280,6 +290,7 @@ pub mod StarkashPay {
             let this_contract = get_contract_address();
             let strk_contract = IERC20Dispatcher { contract_address: payment_token };
             let timestamp = get_block_timestamp();
+            self.reentrancy_guard.start();
 
             strk_contract.transferFrom(get_caller_address(), this_contract, amount);
 
@@ -293,6 +304,7 @@ pub mod StarkashPay {
 
             self.emit(Paid { merchant_id, billing_id, payment_token, amount, timestamp });
             self.merchant_billing.write(billing_id, billing);
+            self.reentrancy_guard.end();
             billing
         }
 
