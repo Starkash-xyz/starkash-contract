@@ -285,7 +285,7 @@ pub mod StarkashPay {
             assert(payment_token == self.payment_token.read(), 'Invalid token');
 
             let existing_merchant_billing_id = self.merchant_billing.read((billing_id));
-            assert(existing_merchant_billing_id.billing_id == 0, 'Merchant billing ID already exists');
+            assert(existing_merchant_billing_id.billing_id == 0, 'Billing ID already exists');
 
             let fee_percentage: u256 = 5; // Fee 0.05%
             let fee_divisor: u256 = 10000;
@@ -328,7 +328,7 @@ pub mod StarkashPay {
             assert(amount > 0, 'Amount must be > 0');
 
             let existing_p2p_billing_id = self.p2p_billing.read((billing_id));
-            assert(existing_p2p_billing_id.billing_id == 0, 'P2P billing ID already exists');
+            assert(existing_p2p_billing_id.billing_id == 0, 'Billing ID already exists');
 
             let strk_contract = IERC20Dispatcher { contract_address: payment_token };
             let payer = get_caller_address();
