@@ -6,7 +6,7 @@ struct Merchant {
     creator: ContractAddress,
     merchant_name: felt252,
     merchant_wallet: ContractAddress,
-    is_active: bool,
+    is_active: bool
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -15,7 +15,7 @@ struct MerchantBilling {
     merchant_id: u64,
     payment_token: ContractAddress,
     amount: u256,
-    timestamp: u64,
+    timestamp: u64
 }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -25,7 +25,7 @@ struct P2PBilling {
     receiver: ContractAddress,
     payment_token: ContractAddress,
     amount: u256,
-    timestamp: u64,
+    timestamp: u64
 }
 
 #[starknet::interface]
@@ -35,6 +35,7 @@ trait IStarkashPay<TContractState> {
     fn get_merchant_name(self: @TContractState, merchant_id: u64) -> felt252;
     fn get_merchant_wallet(self: @TContractState, merchant_id: u64) -> ContractAddress;
     fn get_merchant_billing(self: @TContractState, billing_id: felt252) -> MerchantBilling;
+    fn get_payment_token(self: @TContractState) -> ContractAddress;
     fn get_p2p_billing(self: @TContractState, billing_id: felt252) -> P2PBilling;
     fn create_merchant(
         ref self: TContractState, merchant_name: felt252, merchant_wallet: ContractAddress,
@@ -60,7 +61,7 @@ trait IStarkashPay<TContractState> {
         payment_token: ContractAddress,
         amount: u256,
     ) -> P2PBilling;
-    // fn withdraw_fee(ref self: TContractState, shop_id: u64, payment_token: ContractAddress);
+    fn claim_fee(ref self: TContractState) -> u256;
 }
 
 #[starknet::contract]
@@ -104,6 +105,8 @@ pub mod StarkashPay {
         payment_token: ContractAddress,
         merchant_billing: Map::<felt252, MerchantBilling>,
         p2p_billing: Map::<felt252, P2PBilling>,
+        total_fees_collected: u256,
+        total_fees_claimed: u256,
         #[substorage(v0)]
         pausable: PausableComponent::Storage,
         #[substorage(v0)]
@@ -120,6 +123,7 @@ pub mod StarkashPay {
         MerchantDeactivated: MerchantDeactivated,
         Paid: Paid,
         P2PPaid: P2PPaid,
+        FeeClaimed: FeeClaimed,
         #[flat]
         PausableEvent: PausableComponent::Event,
         #[flat]
@@ -131,17 +135,17 @@ pub mod StarkashPay {
         merchant_id: u64,
         merchant_name: felt252,
         merchant_wallet: ContractAddress,
-        creator: ContractAddress,
+        creator: ContractAddress
     }
 
     #[derive(Drop, starknet::Event)]
     struct MerchantUpdated {
-        merchant_id: u64,
+        merchant_id: u64
     }
 
     #[derive(Drop, starknet::Event)]
     struct MerchantDeactivated {
-        merchant_id: u64,
+        merchant_id: u64
     }
 
     #[derive(Drop, starknet::Event)]
@@ -150,7 +154,7 @@ pub mod StarkashPay {
         billing_id: felt252,
         payment_token: ContractAddress,
         amount: u256,
-        timestamp: u64,
+        timestamp: u64
     }
 
     #[derive(Drop, starknet::Event)]
@@ -160,7 +164,13 @@ pub mod StarkashPay {
         payer: ContractAddress,
         payment_token: ContractAddress,
         amount: u256,
-        timestamp: u64,
+        timestamp: u64
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct FeeClaimed {
+        amount: u256,
+        timestamp: u64
     }
 
     #[constructor]
@@ -213,6 +223,11 @@ pub mod StarkashPay {
             merchant.merchant_wallet
         }
 
+        fn get_payment_token(self: @ContractState) -> ContractAddress {
+            let payment_token = self.payment_token.read();
+            payment_token
+        }
+
         fn create_merchant(
             ref self: ContractState, merchant_name: felt252, merchant_wallet: ContractAddress
         ) -> u64 {
@@ -246,7 +261,7 @@ pub mod StarkashPay {
                 creator: merchant.creator,
                 merchant_name,
                 merchant_wallet,
-                is_active: true,
+                is_active: true
             };
             self.all_merchant.write(merchant_id, new_merchant);
             self.emit(MerchantUpdated { merchant_id });
@@ -275,7 +290,7 @@ pub mod StarkashPay {
             merchant_id: u64,
             billing_id: felt252,
             payment_token: ContractAddress,
-            amount: u256,
+            amount: u256
         ) -> MerchantBilling {
             self.pausable.assert_not_paused();
 
@@ -298,18 +313,17 @@ pub mod StarkashPay {
             let timestamp = get_block_timestamp();
             self.reentrancy_guard.start();
 
+            let billing = MerchantBilling {
+                billing_id, merchant_id, payment_token, amount: amount, timestamp
+            };
+            self.total_fees_collected.write(self.total_fees_collected.read() + fee_amount);
+            self.merchant_billing.write(billing_id, billing);
             strk_contract.transferFrom(get_caller_address(), this_contract, amount);
 
             if amount_after_fee > 0 {
                 strk_contract.transfer(merchant.merchant_wallet, amount_after_fee);
             }
-
-            let billing = MerchantBilling {
-                billing_id, merchant_id, payment_token, amount: amount, timestamp
-            };
-
             self.emit(Paid { merchant_id, billing_id, payment_token, amount, timestamp });
-            self.merchant_billing.write(billing_id, billing);
             self.reentrancy_guard.end();
             billing
         }
@@ -319,7 +333,7 @@ pub mod StarkashPay {
             billing_id: felt252,
             receiver: ContractAddress,
             payment_token: ContractAddress,
-            amount: u256,
+            amount: u256
         ) -> P2PBilling {
             self.pausable.assert_not_paused();
 
@@ -333,16 +347,38 @@ pub mod StarkashPay {
             let strk_contract = IERC20Dispatcher { contract_address: payment_token };
             let payer = get_caller_address();
             let timestamp = get_block_timestamp();
-
-            strk_contract.transferFrom(payer, receiver, amount);
+            self.reentrancy_guard.start();
 
             let billing = P2PBilling {
                 billing_id, payer, receiver, payment_token, amount, timestamp
             };
-
-            self.emit(P2PPaid { billing_id, receiver, payer, payment_token, amount, timestamp });
             self.p2p_billing.write(billing_id, billing);
+            strk_contract.transferFrom(payer, receiver, amount);
+            self.emit(P2PPaid { billing_id, receiver, payer, payment_token, amount, timestamp });
+
+            self.reentrancy_guard.end();
             billing
+        }
+
+        fn claim_fee(ref self: ContractState) -> u256 {
+            self.pausable.assert_not_paused();
+            self.ownable.assert_only_owner();
+
+            let caller = get_caller_address();
+            assert(self.total_fees_collected.read() > self.total_fees_claimed.read(), 'No fees to claim');
+
+            let claimable_amount = self.total_fees_collected.read() - self.total_fees_claimed.read();
+            assert(claimable_amount > 0, 'No fees available for claim');
+            let timestamp = get_block_timestamp();
+            let strk_contract = IERC20Dispatcher { contract_address: self.payment_token.read() };
+            self.reentrancy_guard.start();
+
+            self.total_fees_claimed.write(self.total_fees_claimed.read() + claimable_amount);
+            strk_contract.transfer(caller, claimable_amount);
+            self.emit(FeeClaimed {amount: claimable_amount, timestamp});
+
+            self.reentrancy_guard.end();
+            claimable_amount
         }
     }
 }

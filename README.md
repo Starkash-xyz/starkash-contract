@@ -6,11 +6,14 @@ StarkashPay is a decentralized payment gateway built on Starknet, designed to fa
 
 ### ClassHash
 
-`0x73171aa1c075682f960c1904fdf6d04d44e511e84f745825e4ddaa60a161c1f`
+Sepolia
+`0x4a05ea76beb0c1681b02f36e2a747ead4ed41c54fff2f77e218fe86e84c4424`
+[StarkScan](https://sepolia.starkscan.co/class/0x4a05ea76beb0c1681b02f36e2a747ead4ed41c54fff2f77e218fe86e84c4424) | [Voyager](https://sepolia.voyager.online/class/0x4a05ea76beb0c1681b02f36e2a747ead4ed41c54fff2f77e218fe86e84c4424)
 
 ### Deployed Address
 
-`0x5fd58f8eb33c96c7af1468e7fc1bb791824a3e70985f0fd0135a74f0e215d09`
+`0x1726c25b97a4132ede271f34d96b452fd436116b037d2991ef9c4f7cfe814ef`
+[StarkScan](https://sepolia.starkscan.co/contract/0x1726c25b97a4132ede271f34d96b452fd436116b037d2991ef9c4f7cfe814ef) | [Voyager](https://sepolia.voyager.online/contract/0x1726c25b97a4132ede271f34d96b452fd436116b037d2991ef9c4f7cfe814ef)
 
 ## Features
 
