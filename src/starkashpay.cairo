@@ -281,6 +281,7 @@ pub mod StarkashPay {
 
             let mut merchant = self.all_merchant.read(merchant_id);
             assert(merchant.is_active, 'Merchant is inactive');
+            assert(amount > 0, 'Amount must be > 0');
             assert(payment_token == self.payment_token.read(), 'Invalid token');
 
             let existing_merchant_billing_id = self.merchant_billing.read((billing_id));
@@ -324,6 +325,7 @@ pub mod StarkashPay {
 
             assert(payment_token == self.payment_token.read(), 'Invalid token');
             assert(Zero::is_non_zero(@receiver), 'Receiver address zero');
+            assert(amount > 0, 'Amount must be > 0');
 
             let existing_p2p_billing_id = self.p2p_billing.read((billing_id));
             assert(existing_p2p_billing_id.billing_id == 0, 'P2P billing ID already exists');
