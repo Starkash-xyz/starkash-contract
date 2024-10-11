@@ -1,9 +1,7 @@
 # Visit https://foundry-rs.github.io/starknet-foundry/appendix/snfoundry-toml.html for more information
 
-[sncast.myprofile1]
+[sncast.default]
 url = "https://starknet-sepolia.public.blastapi.io/rpc/v0_7"
-# accounts_file = "../account-file"                      # Path to the file with the account data
 account = "starkash"
-# keystore = "~/keystore"                                # Path to the keystore file
 wait_params = { timeout = 500, retry_interval = 10 }
 block_explorer = "StarkScan"

@@ -3,6 +3,7 @@ target
 .env
 node_modules
 scripts
+.snfoundry_cache
 
 
 

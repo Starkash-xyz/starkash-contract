@@ -134,6 +134,10 @@ StarkashPay emits several events to track the state of the contract:
 2. Process payments using the `pay` function for merchants and `pay_p2p` for direct payments between users.
 3. Manage contract state by pausing and unpausing as needed.
 
+## SNCast Multicall
+
+1. `pay`: `sncast multicall run --path test-pay.toml --fee-token eth`
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
